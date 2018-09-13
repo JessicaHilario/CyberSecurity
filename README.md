@@ -1,3 +1,3 @@
 # GroupDos
 
-Somos grupo de Dos. Bienvenido a nuestro repositorio github.
+Somos grupo de Dos!! :D Bienvenido a nuestro repositorio github.
