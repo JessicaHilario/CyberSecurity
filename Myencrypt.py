@@ -2,23 +2,23 @@ import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
-
+from constants import *
 
 def Myencrypt(message, key):
     """ generate 16 bytes IV, and encrypt the message using key and IV
     in CBC mode AES. return cipher and IV"""
 
-    assert (len(key) >= 32),"key length is below 32 bits"
+    assert (len(key) >= KEY_SIZE),"key length is below 32 bits"
     
     # generate Initialization vector to be 16 bytes 
-    IV = os.urandom(16)
+    IV = os.urandom(IV_SIZE)
 
     cipher_obj = Cipher(algorithms.AES(key), modes.CBC(IV), backend=default_backend())
 
     encrypt = cipher_obj.encryptor()
 
-    # padding using standard padding on block size 256
-    pad = padding.PKCS7(256).padder()
+    # padding using standard padding on block size BLOCK_SIZE
+    pad = padding.PKCS7(BLOCK_SIZE).padder()
 
     padded_data = pad.update(message)
     padded_data += pad.finalize()
@@ -37,7 +37,7 @@ def MyfileEncrypt(filepath):
     You return the cipher C, IV, key and the extension of the file (as a string)."""
 
     # generate 32 byte key 
-    key = os.urandom(32)
+    key = os.urandom(KEY_SIZE)
 
     # get the file extension
     path, file_ext = os.path.splitext(filepath)
@@ -76,7 +76,7 @@ def Mydecrypt(cipher, IV, key):
     message_padded = decryptor.update(cipher) + decryptor.finalize()
     
     # create unpadder and unpad message     
-    unpadder = padding.PKCS7(256).unpadder()
+    unpadder = padding.PKCS7(BLOCK_SIZE).unpadder()
     message = unpadder.update(message_padded) + unpadder.finalize()
 
     return message
