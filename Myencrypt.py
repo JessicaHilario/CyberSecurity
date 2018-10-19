@@ -1,104 +1,145 @@
 import os
+from constants import *
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding
-from constants import *
+from cryptography.hazmat.primitives import padding, hashes, hmac
 
 def Myencrypt(message, key):
-    """ generate 16 bytes IV, and encrypt the message using key and IV
-    in CBC mode AES. return cipher and IV"""
-
-    assert (len(key) >= KEY_SIZE),"key length is below 32 bits"
-    
-    # generate Initialization vector to be 16 bytes 
-    IV = os.urandom(IV_SIZE)
-
-    cipher_obj = Cipher(algorithms.AES(key), modes.CBC(IV), backend=default_backend())
-
-    encrypt = cipher_obj.encryptor()
-
-    # padding using standard padding on block size BLOCK_SIZE
-    pad = padding.PKCS7(BLOCK_SIZE).padder()
-
-    padded_data = pad.update(message)
-    padded_data += pad.finalize()
-
-    # encrypting the with the padded data
-    cipher_text = encrypt.update(padded_data)
-    cipher_text += encrypt.finalize()
-
-    return cipher_text,IV
-
+	#Myencrypt encrypts the message using key and IV
+	
+	#Makes sure the key is at least 32
+	assert(len(key)>=KEY_SIZE), "Key length is less than 32"
+	backend = default_backend()
+	
+	#Generate an IV in 16 bytes
+	IV = os.urandom(IV_SIZE)
+	
+	#Pads on a block size of 256
+	padder = padding.PKCS7(BLOCK_SIZE).padder()
+	padded = padder.update(message) + padder.finalize()
+	
+	#Encrypt with the padded data
+	cipher = Cipher(algorithms.AES(key), modes.CBC(IV), backend=backend) #Use CBC to start the encrypt
+	encryptor = cipher.encryptor()
+	ct = encryptor.update(padded) + encryptor.finalize()#Encrypt the message
+	
+	return ct, IV
+	
 
 def MyfileEncrypt(filepath):
-    """In this method, you'll generate a 32Byte key.
-    You open and read the file as a string. You then call
-    the above method to encrypt your file using the key you generated.
-    You return the cipher C, IV, key and the extension of the file (as a string)."""
+	#MyfileEncrypt opens the file and read it as a string
+	
+	#Generate a key with 32 bits
+	key = os.urandom(KEY_SIZE)
+	
+	#Get the extension of the file
+	path, ext = os.path.split(filepath)
+		
+	#Read file
+	file = open(filepath,'rb')
+	file_read = file.read()
+	file.close()
+		
+	#Encrypt the data
+	C,IV = Myencrypt(file_read, key)
+	
+	#write to the file
+	file_write = open(filepath,'wb')
+	file_write.write(C)
+	file_write.close()
 
-    # generate 32 byte key 
-    key = os.urandom(KEY_SIZE)
-
-    # get the file extension
-    path, file_ext = os.path.splitext(filepath)
-
-    # open and read file
-    file = open(filepath, 'rb')
-    file_in = file.read()
-    
-    print("message is " + str(file_in))
-    print()
-
-    file.close() # close the file 
-    
-    #generate cipher and return IV for the file 
-    cipher,IV = Myencrypt(file_in, key)
-
-    #write to the file
-    file_write = open(filepath, 'wb')
-    file_write.write(cipher)
+	
+	return C, IV, key, path, ext#json_data + " json.txt"
 
 
-    print("cipher is " +str(cipher))
-    print()
-    file_write.close()
-    return cipher, IV, key, file_ext
-
-
-def Mydecrypt(cipher, IV, key):
-    """ decrypts the cipher text using IV and key"""
-
-    # create decryption 
-    cipher_obj = Cipher(algorithms.AES(key), modes.CBC(IV), backend=default_backend())
-    decryptor = cipher_obj.decryptor()
+def Mydecrypt(C,IV, key):
+	#Mydecrypt decrypts the cipher text using the IV and key
+	
+	#Make sure the key length is at least 32
+	assert(len(key)>=KEY_SIZE), "Key length is less than 32"
+	# create decryption 
+	cipher_obj = Cipher(algorithms.AES(key), modes.CBC(IV), backend=default_backend())
+	decryptor = cipher_obj.decryptor()
     
     # decrypt message
-    message_padded = decryptor.update(cipher) + decryptor.finalize()
+	message_padded = decryptor.update(C) + decryptor.finalize()
     
     # create unpadder and unpad message     
-    unpadder = padding.PKCS7(BLOCK_SIZE).unpadder()
-    message = unpadder.update(message_padded) + unpadder.finalize()
+	unpadder = padding.PKCS7(BLOCK_SIZE).unpadder()
+	message = unpadder.update(message_padded) + unpadder.finalize()
+	
+	return message
 
-    return message
+def MyfileDecrypt(C, IV, key, filename, ext):
+	#MyfileDecrypt decrypts file and place original message back
+	
+	#Decrypt the data
+	message = Mydecrypt(C,IV,key)
+	
+	#Writes to the same file
+	jf = open(filename, "wb")
+	jf.write(message)
+	jf.close()
+	
+	return message
 
+def MyencryptMAC(message, EncKey, HMACKey):
+	
+	#Encrypt the message and get the cipher and IV
+	C, IV = Myencrypt(message, EncKey) #Encrypt
+	
+	#Then MAC
+	tag = hmac.HMAC(HMACKey, hashes.SHA256(), backend=default_backend()) #Returns an object of the class
+	tag.update(C) # Bytes to hash then authenticate
+	tag = tag.finalize() #Finalize the current context and return the message digest as bytes
+	
+	return C, IV, tag
 
-def MyfileDecryptor(cipher, IV, key, file):
-    '''decrypt file and place original message back '''
+def MyfileEncryptMAC(filepath):
+	
+	#Generate the HMAC Key and Encryption Key
+	HMACKey = os.urandom(KEY_SIZE)
+	EncKey = os.urandom(KEY_SIZE)
+	
+	#Get the extension of the file
+	path, ext = os.path.split(filepath)
+	
+	#Read file
+	file = open(filepath,'rb')
+	message = file.read()
+	file.close()
+	
+	#Encrypt the file and get the cipher, IV and key
+	C, IV, tag = MyencryptMAC(message, EncKey, HMACKey)
+	
+	#write cipher to file
+	file_write = open(filepath,'wb')
+	file_write.write(C)
+	file_write.close()
+	
+	return C, IV, tag, EncKey, HMACKey, ext
+	
+def MydecryptMAC(C, IV, tag, HMACKey, EncKey):
 
-    # decrypt the message 
-    message = Mydecrypt(cipher, IV, key)
-    print("message is  is " + str(message))
-    print()
+	assert(len(HMACKey) >= KEY_SIZE and  len(EncKey) >= KEY_SIZE),"Key length is less than 32"
+	
+	tagTest = hmac.HMAC(HMACKey, hashes.SHA256(), backend=default_backend()) #Returns an object of the class
+	
+	tagTest.update(C) # Turn the byte to hash and authenticate
+	tagTest.verify(tag) # Finalize and compare the digest to signature
+	# Return error if signature does not match digest
+	
+	#Decrypt the message and get the message
+	message = Mydecrypt(C, IV, EncKey)
+	
+	return message
 
-    # write the message back to the file
-    file_write = open(file, 'wb')
-    file_write.write(message) 
-    file_write.close() # close the file 
-    return message
-    
-
-file = "test.txt"
-cipher, IV, key, file_ext = MyfileEncrypt(file)
-input()
-
-msg = MyfileDecryptor(cipher, IV, key, file)
+def MyfileDecryptMAC(C, IV, tag, EncKey, HMACKey, filepath, ext):
+	
+	message = MydecryptMAC(C, IV, tag, HMACKey, EncKey) # decrpty cipher
+	
+	#Writes to the same file
+	jf = open(filepath, "wb")
+	jf.write(message)
+	jf.close()
+	return message
