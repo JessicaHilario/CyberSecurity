@@ -1,3 +1,6 @@
 KEY_SIZE = 32
 BLOCK_SIZE = 256
 IV_SIZE = 16
+FERMAT_PRIME = 65537
+RSA_KEY_SIZE = 2048
+KEYS_FILE_PATH = "/home/jay/Classes/378/coding/GroupDos"
