@@ -75,7 +75,8 @@ def MyfileDecrypt(C, IV, key, filename, ext):
 	
 	#Decrypt the data
 	message = Mydecrypt(C,IV,key)
-	
+
+
 	#Writes to the same file
 	jf = open(filename, "wb")
 	jf.write(message)
@@ -135,11 +136,19 @@ def MydecryptMAC(C, IV, tag, HMACKey, EncKey):
 	return message
 
 def MyfileDecryptMAC(C, IV, tag, EncKey, HMACKey, filepath, ext):
-	
-	message = MydecryptMAC(C, IV, tag, HMACKey, EncKey) # decrpty cipher
-	
-	#Writes to the same file
-	jf = open(filepath, "wb")
-	jf.write(message)
-	jf.close()
-	return message
+        message = MydecryptMAC(C, IV, tag, HMACKey, EncKey) # decrpty cipher
+        #Writes to the same file
+        jf = open(os.path.join(os.path.dirname(filepath),ext), "wb")
+        jf.write(message)
+        jf.close()
+        return message
+
+
+
+##filepath = "test.txt"
+##C, IV, tag, EncKey, HMACKey, ext = MyfileEncryptMAC(filepath)
+##input("press enter")
+##print(ext)
+##MyfileDecryptMAC(C, IV, tag, EncKey, HMACKey, filepath, ext)
+
+
